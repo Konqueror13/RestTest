@@ -3,100 +3,103 @@ package source;
 import com.google.gson.*;
 import org.springframework.web.bind.annotation.*;
 import org.apache.commons.io.FileUtils;
-
 import java.io.File;
-import java.io.IOException;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
+import java.util.*;
 
 @RestController
-public class AppController {
-
+public class AppController
+{
+    //get tasks older than 4 hours
     @RequestMapping("/getOlderTasks")
     @ResponseBody
-    public String getOlderTasks()
+    public Result getOlderTasks()
     {
-        JsonArray tasksArray = getAllTasks();
+        Result tasksArray = getAllTasks();       //fetch all tasks
 
         try
         {
-            JsonArray olderTasks = new JsonArray();
-            for (int i=0; i<tasksArray.size(); i++)
+            ArrayList<Task> olderTasks = new ArrayList<>();
+            for (int i=0; i<tasksArray.getTasks().size(); i++)
             {
-                String dateString = tasksArray.get(i).getAsJsonObject().get("CREATIONDATE").getAsString().substring(26, 45);
+                String dateString = tasksArray.getTasks().get(i).getCREATIONDATE().substring(26, 45);    //read the date from the field
                 Calendar calendar = Calendar.getInstance();
-                calendar.add(Calendar.DAY_OF_MONTH, -5);
+                calendar.add(Calendar.HOUR, -4);
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-                Date minusFourHours = calendar.getTime();
-                Date inputDate = sdf.parse(dateString);
+                Date minusFourHours = calendar.getTime();       //calculate the time it was 4 hours ago
+                Date inputDate = sdf.parse(dateString);         //get the date and time from the input
 
+                //compare the dates
                 if (inputDate.before(minusFourHours))
                 {
-                    olderTasks.add(tasksArray.get(i));
+                    olderTasks.add(tasksArray.getTasks().get(i));
                 }
             }
-            Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
-            return "Tasks = " +olderTasks.size() + "\n" + gson.toJson(olderTasks);
+            return new Result(String.valueOf(olderTasks.size()), "", olderTasks);
         }
-        catch (ParseException e)
+        catch (Exception e)
         {
             e.printStackTrace();
+            return new Result("0", "exception", new ArrayList<>());
         }
-        return "no tasks older than 4 hours found";
     }
 
     @RequestMapping("/getTasksBySecuritySystem/{securitySystem}")
     @ResponseBody
-    public String getTasksBySecuritySystem(@PathVariable("securitySystem") String securitySystem)
+    public Result getTasksBySecuritySystem(@PathVariable("securitySystem") String securitySystem)
     {
-        JsonArray tasksArray = getAllTasks();
-        JsonArray tasksBySecuritySystem = new JsonArray();
+        Result resultArray = getAllTasks();
+        ArrayList<Task> tasks = new ArrayList<>();
 
-        for (int i=0; i<tasksArray.size(); i++)
+        //filter tasks with the given security system
+        for (int i=0; i<resultArray.getTasks().size(); i++)
         {
-            if (tasksArray.get(i).getAsJsonObject().get("SECURITYSYSTEM").getAsString().equals(securitySystem))
+            if (resultArray.getTasks().get(i).getSECURITYSYSTEM().equals(securitySystem))
             {
-                tasksBySecuritySystem.add(tasksArray.get(i));
+                tasks.add(resultArray.getTasks().get(i));
             }
         }
-        Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
-        return "Results = " + tasksBySecuritySystem.size() + "\n" + gson.toJson(tasksBySecuritySystem);
+        return new Result(String.valueOf(tasks.size()), "", tasks);
     }
 
     @RequestMapping("/getTaskByRequestId/{requestId}")
     @ResponseBody
-    public String getTaskByRequestId(@PathVariable("requestId") String requestId)
+    public Result getTaskByRequestId(@PathVariable("requestId") String requestId)
     {
-        JsonArray tasksArray = getAllTasks();
+        Result result = getAllTasks();
 
-        for (int i=0; i<tasksArray.size(); i++)
+        for (int i=0; i<result.getTasks().size(); i++)
         {
-            if (tasksArray.get(i).getAsJsonObject().get("TASKID").getAsString().equals(requestId))
+            if (result.getTasks().get(i).getTASKID().equals(requestId))
             {
-                Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
-                return gson.toJson(tasksArray.get(i));
+                return new Result(result.getTasks().get(i));
             }
         }
-        return "Request Not Found";
+        return new Result("0", "no result found", new ArrayList<>());
     }
 
 
-    private JsonArray getAllTasks()
+    /**
+     * Fetches all the results from the input file.
+     * The input file is used in order to avoid the connection to the real server which is
+     * not the purpose of this exercise i suppose.
+     * In the input.json place the result of "https://ibm-pprod.idaccesshub.com/ECM/ws/rest/fetchTasks
+     * as it comes in postman.
+     * @return Result object
+     */
+    private Result getAllTasks()
     {
         try
         {
             String fileName = "input.json";
             ClassLoader classLoader = ClassLoader.getSystemClassLoader();
-            File file = new File(classLoader.getResource(fileName).getPath().replace("%20", " "));
+            File file = new File(classLoader.getResource(fileName).getPath().replace("%20", " "));      //.replace is needed in mac only
             String inputString = FileUtils.readFileToString(file);
-            JsonParser parser = new JsonParser();
-            JsonObject json = (JsonObject) parser.parse(inputString);
 
-            return json.getAsJsonArray("tasks");
+            Gson gson = new Gson();
+            return gson.fromJson(inputString, Result.class);
         }
-        catch (IOException e)
+        catch (Exception e)
         {
             e.printStackTrace();
         }
