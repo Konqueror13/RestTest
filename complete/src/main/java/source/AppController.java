@@ -67,15 +67,31 @@ public class AppController
     public Result getTaskByRequestId(@PathVariable("requestId") String requestId)
     {
         Result result = getAllTasks();
+        Result returnResult;
+        String errorCode = "no result found";
 
-        for (int i=0; i<result.getTasks().size(); i++)
+        //find the task with the given request id
+        for (int i=0; i < result.getTasks().size(); i++)
         {
             if (result.getTasks().get(i).getTASKID().equals(requestId))
             {
-                return new Result(result.getTasks().get(i));
+                //check if the task has a parent task
+                String parentTask = result.getTasks().get(i).getPARENTTASK();
+                if (!parentTask.isEmpty())
+                {
+                    ArrayList list = getChildTasks(parentTask.substring(0, 6), result);
+                    errorCode = "the id is related to more than 1 tasks";
+                    return new Result(String.valueOf(list.size()), errorCode, list);
+                }
+                else
+                {
+                    returnResult = new Result(result.getTasks().get(i));
+                    return returnResult;
+                }
             }
         }
-        return new Result("0", "no result found", new ArrayList<>());
+        returnResult = new Result("0", errorCode, new ArrayList<>());
+        return returnResult;
     }
 
 
@@ -104,5 +120,25 @@ public class AppController
             e.printStackTrace();
         }
         return null;
+    }
+
+    /**
+     * Finds all the tasks with the same parent task id and returns a list of them
+     * @param parentTaskId
+     * @param result
+     * @return
+     */
+    private ArrayList<Task> getChildTasks(String parentTaskId, Result result)
+    {
+        ArrayList list = new ArrayList();
+
+        for (int i=0; i < result.getTasks().size(); i++)
+        {
+            if (result.getTasks().get(i).getPARENTTASK().contains(parentTaskId))
+            {
+                list.add(result.getTasks().get(i));
+            }
+        }
+        return list;
     }
 }
